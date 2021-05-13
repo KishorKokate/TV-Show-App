@@ -1,0 +1,110 @@
+package com.example.tvshowapp.activities;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.databinding.DataBindingUtil;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.tvshowapp.R;
+import com.example.tvshowapp.adapters.TVShowadapetr;
+import com.example.tvshowapp.databinding.ActivityMainBinding;
+import com.example.tvshowapp.listeners.TVShowListener;
+import com.example.tvshowapp.models.TVShow;
+import com.example.tvshowapp.models.TVShowDetails;
+import com.example.tvshowapp.response.TVShowResponse;
+import com.example.tvshowapp.viewmodels.MostPopularTVShowsViewModel;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MainActivity extends AppCompatActivity implements TVShowListener {
+
+    private MostPopularTVShowsViewModel viewModel;
+
+    private ActivityMainBinding activityMainBinding;
+
+    private List<TVShow> tvShows = new ArrayList<>();
+    private TVShowadapetr tvShowadapetr;
+    private int currentPage = 1;
+    private int totalAvailablePages = 1;
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        activityMainBinding = DataBindingUtil.setContentView(this, R.layout.activity_main);
+
+        doInitialization();
+
+    }
+
+    private void doInitialization() {
+        activityMainBinding.tvShowRecyclerView.setHasFixedSize(true);
+        viewModel = new ViewModelProvider(this).get(MostPopularTVShowsViewModel.class);
+        tvShowadapetr = new TVShowadapetr(tvShows, this);
+        activityMainBinding.tvShowRecyclerView.setAdapter(tvShowadapetr);
+        activityMainBinding.tvShowRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if (!activityMainBinding.tvShowRecyclerView.canScrollVertically(1)) {
+                    if (currentPage <= totalAvailablePages) {
+                        currentPage += 1;
+                        getMostPopularTVShows();
+                    }
+                }
+            }
+        });
+
+        activityMainBinding.imageSearch.setOnClickListener(v -> startActivity(new Intent(getApplicationContext(), SearchActivity.class)));
+        getMostPopularTVShows();
+    }
+
+    private void getMostPopularTVShows() {
+        toggleLoading();
+        viewModel.getMostPopularTVShows(currentPage).observe(this, (TVShowResponse mostPopularTVShowResponse) -> {
+
+            toggleLoading();
+            if (mostPopularTVShowResponse != null) {
+                totalAvailablePages = mostPopularTVShowResponse.getTotalPages();
+                if (mostPopularTVShowResponse.getTvShows() != null) {
+                    int oldCount = tvShows.size();
+                    tvShows.addAll(mostPopularTVShowResponse.getTvShows());
+                    tvShowadapetr.notifyItemRangeInserted(oldCount, tvShows.size());
+                }
+            }
+        });
+    }
+
+    private void toggleLoading() {
+        if (currentPage == 1) {
+            if (activityMainBinding.getIsLoading() != null && activityMainBinding.getIsLoading()) {
+                activityMainBinding.setIsLoading(false);
+            } else {
+                activityMainBinding.setIsLoading(true);
+            }
+        } else {
+            if (activityMainBinding.getIsLoadingMore() != null && activityMainBinding.getIsLoadingMore()) {
+                activityMainBinding.setIsLoadingMore(false);
+            } else {
+                activityMainBinding.setIsLoadingMore(true);
+            }
+
+        }
+    }
+
+    @Override
+    public void onTVShowClicked(TVShow tvShow) {
+
+        Intent intent = new Intent(getApplicationContext(), TVShowdetailActivity.class);
+        intent.putExtra("tvShow", tvShow);
+        startActivity(intent);
+    }
+}
